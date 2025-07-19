@@ -1,0 +1,50 @@
+{
+    // VS CodeのUIに表示される開発コンテナの名前
+    "name": "Raspberry Pi C++ Cross-Compile",
+
+    // コンテナのビルド方法を指定
+    "build": {
+        // 使用するDockerfileのパス
+        "dockerfile": "Dockerfile"
+    },
+
+    // ワークスペースのマウント設定
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+    "workspaceFolder": "/workspace",
+
+    // Dockerコンテナ起動時の引数を指定
+    "runArgs": [
+        // プロジェクトルートの.envファイルをコンテナの環境変数として読み込む
+        // これにより、launch.jsonやスクリプトから.envの値を参照できる
+        "--env-file",
+        "${localWorkspaceFolder}/.env"
+    ],
+
+    // コンテナが作成された"後"に一度だけ実行されるコマンド
+    "postCreateCommand": "bash .devcontainer/sync_sysroot.sh",
+
+    // VS Codeエディタ自体のカスタマイズ
+    "customizations": {
+        "vscode": {
+            // コンテナ内で有効化するVS Code拡張機能のリスト
+            "extensions": [
+                "ms-vscode.cpptools",
+                "ms-vscode.cmake-tools",
+                "ms-vscode-remote.remote-containers",
+                "ms-vscode-remote.remote-wsl",
+                "ms-azuretools.vscode-docker"
+            ],
+            // コンテナ内のVS Codeに適用される設定
+            "settings": {
+                // CMake Tools拡張機能に、常にクロスコンパイル用の設定ファイルを使うように指示
+                "cmake.configureArgs": [
+                    "-DCMAKE_TOOLCHAIN_FILE=/workspace/.devcontainer/aarch64-linux-gnu.cmake"
+                ]
+            }
+        }
+    },
+
+    // コンテナ内でコマンドを実行するデフォルトユーザー
+    // rootにすることで、パッケージインストールやSysrootのパーミッション問題を回避
+    "remoteUser": "root"
+}
