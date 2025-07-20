@@ -1,138 +1,140 @@
-/**
- * @file Renderer.cpp
- * @brief OpenGL ESによる描画処理を行うクラスの実装
- */
 #include "Renderer.h"
 #include <iostream>
 #include <vector>
-#include <cmath> // M_PI, cosf, sinf のために必要
+#include <cstring>
 
 Renderer::Renderer() {}
-
-Renderer::~Renderer()
-{
-    shutdown();
-}
+Renderer::~Renderer() { shutdown(); }
 
 bool Renderer::initialize()
 {
-    // 頂点シェーダーのソースコード
-    // a_position: 頂点座標 (入力)
-    // u_mvpMatrix: モデル・ビュー・プロジェクション行列 (外部から設定)
-    // gl_Position: 最終的な頂点のスクリーン上の位置 (出力)
-    const char vShaderStr[] =
-        "attribute vec4 a_position;   \n"
-        "uniform mat4 u_mvpMatrix;    \n"
-        "void main()                  \n"
-        "{                            \n"
-        "   gl_Position = u_mvpMatrix * a_position; \n"
-        "}                            \n";
+    const char *vShaderSrc =
+        "attribute vec4 a_position;      \n"
+        "attribute vec2 a_texCoord;      \n"
+        "varying vec2 v_texCoord;        \n"
+        "void main()                     \n"
+        "{                               \n"
+        "  gl_Position = a_position;     \n"
+        "  v_texCoord = a_texCoord;      \n"
+        "}";
 
-    // フラグメントシェーダーのソースコード
-    // gl_FragColor: ピクセルの最終的な色 (出力)
-    const char fShaderStr[] =
-        "void main()                               \n"
-        "{                                         \n"
-        "  gl_FragColor = vec4(1.0, 0.8, 0.0, 1.0);\n" // オレンジ色
-        "}                                         \n";
+    const char *fShaderSrc =
+        "precision mediump float;                                \n"
+        "varying vec2 v_texCoord;                                \n"
+        "uniform sampler2D tex_y;                                \n"
+        "uniform sampler2D tex_u;                                \n"
+        "uniform sampler2D tex_v;                                \n"
+        "void main()                                             \n"
+        "{                                                       \n"
+        "  float y = texture2D(tex_y, v_texCoord).r;             \n"
+        "  float u = texture2D(tex_u, v_texCoord).r - 0.5;       \n"
+        "  float v = texture2D(tex_v, v_texCoord).r - 0.5;       \n"
+        "  float r = y + 1.402 * v;                              \n"
+        "  float g = y - 0.344 * u - 0.714 * v;                  \n"
+        "  float b = y + 1.772 * u;                              \n"
+        "  gl_FragColor = vec4(r, g, b, 1.0);                    \n"
+        "}";
 
-    // シェーダーをコンパイルし、リンクしてプログラムを作成
-    program_ = createProgram(vShaderStr, fShaderStr);
-    if (program_ == 0)
+    programYUV_ = createProgram(vShaderSrc, fShaderSrc);
+    if (!programYUV_)
         return false;
 
-    // シェーダー内の変数の場所(ロケーション)を取得しておく
-    position_loc_ = glGetAttribLocation(program_, "a_position");
-    matrix_loc_ = glGetUniformLocation(program_, "u_mvpMatrix");
+    positionLoc_ = glGetAttribLocation(programYUV_, "a_position");
+    texcoordLoc_ = glGetAttribLocation(programYUV_, "a_texCoord");
+    samplerYLoc_ = glGetUniformLocation(programYUV_, "tex_y");
+    samplerULoc_ = glGetUniformLocation(programYUV_, "tex_u");
+    samplerVLoc_ = glGetUniformLocation(programYUV_, "tex_v");
+
+    glGenTextures(1, &texY_);
+    glGenTextures(1, &texU_);
+    glGenTextures(1, &texV_);
 
     return true;
 }
 
 void Renderer::shutdown()
 {
-    // 作成したシェーダープログラムを解放
-    if (program_ != 0)
-    {
-        glDeleteProgram(program_);
-        program_ = 0;
-    }
+    glDeleteTextures(1, &texY_);
+    glDeleteTextures(1, &texU_);
+    glDeleteTextures(1, &texV_);
+    glDeleteProgram(programYUV_);
 }
 
-void Renderer::render(float angle, uint32_t width, uint32_t height)
+void Renderer::uploadYUVTextures(const uint8_t *data, int width, int height, int ySize, int uSize)
 {
-    // 描画する三角形の頂点データ (x, y, z)
-    GLfloat vVertices[] = {
-        0.0f, 0.5f, 0.0f,   // 上
-        -0.5f, -0.5f, 0.0f, // 左下
-        0.5f, -0.5f, 0.0f   // 右下
-    };
+    const uint8_t *yPlane = data;
+    const uint8_t *uPlane = data + ySize;
+    const uint8_t *vPlane = data + ySize + uSize;
 
-    // --- 回転行列の計算 ---
-    float aspect = (float)width / (float)height;
-    float radians = angle * (M_PI / 180.0f);
-    float cos_a = cosf(radians);
-    float sin_a = sinf(radians);
-    // Z軸回転行列を作成
-    GLfloat matrix[16] = {
-        cos_a, sin_a, 0.0f, 0.0f,
-        -sin_a, cos_a, 0.0f, 0.0f,
-        0.0f, 0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 0.0f, 1.0f};
-    // 画面のアスペクト比に合わせて行列を補正 (縦長/横長でも歪まないようにする)
-    if (aspect > 1.0f)
-    { // 横長の画面
-        matrix[0] /= aspect;
-        matrix[1] /= aspect;
-    }
-    else
-    { // 縦長の画面
-        matrix[4] *= aspect;
-        matrix[5] *= aspect;
-    }
-    // --- 行列計算ここまで ---
+    glBindTexture(GL_TEXTURE_2D, texY_);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height,
+                 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, yPlane);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    // 1. 描画領域(ビューポート)を画面全体に設定
+    glBindTexture(GL_TEXTURE_2D, texU_);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width / 2, height / 2,
+                 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, uPlane);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glBindTexture(GL_TEXTURE_2D, texV_);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width / 2, height / 2,
+                 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, vPlane);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+}
+
+void Renderer::renderYUV(uint32_t width, uint32_t height)
+{
+    const GLfloat vertices[] = {
+        // x, y,     u, v
+        -1.0f, 1.0f, 0.0f, 0.0f,
+        -1.0f, -1.0f, 0.0f, 1.0f,
+        1.0f, -1.0f, 1.0f, 1.0f,
+        1.0f, 1.0f, 1.0f, 0.0f};
+
+    const GLushort indices[] = {0, 1, 2, 0, 2, 3};
+
     glViewport(0, 0, width, height);
-    // 2. 画面をクリアする色を設定 (濃い青色)
-    glClearColor(0.1f, 0.2f, 0.3f, 1.0f);
-    // 3. 実際に画面をクリア
+    glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    // 4. 使用するシェーダープログラムを指定
-    glUseProgram(program_);
+    glUseProgram(programYUV_);
 
-    // 5. 頂点データをシェーダーの a_position 属性に結びつける
-    glVertexAttribPointer(position_loc_, 3, GL_FLOAT, GL_FALSE, 0, vVertices);
-    glEnableVertexAttribArray(position_loc_);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texY_);
+    glUniform1i(samplerYLoc_, 0);
 
-    // 6. 計算した回転行列をシェーダーの u_mvpMatrix uniform変数に送る
-    glUniformMatrix4fv(matrix_loc_, 1, GL_FALSE, matrix);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, texU_);
+    glUniform1i(samplerULoc_, 1);
 
-    // 7. 描画コマンドを実行 (3頂点で1つの三角形を描画)
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, texV_);
+    glUniform1i(samplerVLoc_, 2);
+
+    glEnableVertexAttribArray(positionLoc_);
+    glEnableVertexAttribArray(texcoordLoc_);
+    glVertexAttribPointer(positionLoc_, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), vertices);
+    glVertexAttribPointer(texcoordLoc_, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), vertices + 2);
+
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, indices);
 }
 
-// (以下、プライベートなヘルパー関数の実装)
 GLuint Renderer::loadShader(GLenum type, const char *shaderSrc)
 {
     GLuint shader = glCreateShader(type);
-    if (shader == 0)
-        return 0;
-    glShaderSource(shader, 1, &shaderSrc, NULL);
+    glShaderSource(shader, 1, &shaderSrc, nullptr);
     glCompileShader(shader);
+
     GLint compiled;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
     if (!compiled)
     {
-        GLint infoLen = 0;
-        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLen);
-        if (infoLen > 1)
-        {
-            std::vector<char> infoLog(infoLen);
-            glGetShaderInfoLog(shader, infoLen, NULL, infoLog.data());
-            std::cerr << "Error compiling shader:\n"
-                      << infoLog.data() << std::endl;
-        }
+        char log[512];
+        glGetShaderInfoLog(shader, sizeof(log), nullptr, log);
+        std::cerr << "[Renderer] Shader compile error: " << log << std::endl;
         glDeleteShader(shader);
         return 0;
     }
@@ -143,21 +145,25 @@ GLuint Renderer::createProgram(const char *vShaderSrc, const char *fShaderSrc)
 {
     GLuint vertexShader = loadShader(GL_VERTEX_SHADER, vShaderSrc);
     GLuint fragmentShader = loadShader(GL_FRAGMENT_SHADER, fShaderSrc);
-    if (vertexShader == 0 || fragmentShader == 0)
+    if (!vertexShader || !fragmentShader)
         return 0;
+
     GLuint program = glCreateProgram();
-    if (program == 0)
-        return 0;
     glAttachShader(program, vertexShader);
     glAttachShader(program, fragmentShader);
     glLinkProgram(program);
+
     GLint linked;
     glGetProgramiv(program, GL_LINK_STATUS, &linked);
     if (!linked)
-    { /* ... エラーログ ... */
+    {
+        char log[512];
+        glGetProgramInfoLog(program, sizeof(log), nullptr, log);
+        std::cerr << "[Renderer] Program link error: " << log << std::endl;
         glDeleteProgram(program);
         return 0;
     }
+
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
     return program;

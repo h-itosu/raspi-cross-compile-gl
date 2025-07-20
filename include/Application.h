@@ -1,3 +1,4 @@
+#pragma once
 /**
  * @file Application.h
  * @brief アプリケーション全体を管理するクラスの宣言
@@ -5,6 +6,7 @@
 #ifndef APPLICATION_H
 #define APPLICATION_H
 
+#include "GStreamerSupport.h"
 #include "GraphicsPlatform.h"
 #include "Renderer.h"
 
@@ -12,10 +14,12 @@
  * @class Application
  * @brief アプリケーションのメインループを実行し、全体の初期化と終了処理を統括する。
  */
-class Application {
+class Application
+{
 public:
     /** @brief コンストラクタ */
     Application();
+
     /** @brief デストラクタ */
     ~Application();
 
@@ -31,6 +35,7 @@ public:
     void run();
 
 private:
+    GStreamerSupport gstreamer_; ///< GStreamerサポートのインスタンス
     /// @brief グラフィックスプラットフォームのインスタンス
     GraphicsPlatform platform_;
     /// @brief レンダラーのインスタンス

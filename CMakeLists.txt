@@ -24,8 +24,55 @@ find_library(EGL_LIBRARY NAMES EGL HINTS /usr/lib/aarch64-linux-gnu)
 find_library(DRM_LIBRARY NAMES drm HINTS /usr/lib/aarch64-linux-gnu)
 find_library(GBM_LIBRARY NAMES gbm HINTS /usr/lib/aarch64-linux-gnu)
 
+# --- GStreamerとGLibのヘッダ検索 ---
+find_path(GSTREAMER_INCLUDE_DIR gst/gst.h
+    PATHS /opt/raspi_sysroot/usr/include/gstreamer-1.0
+)
+find_path(GLIB_INCLUDE_DIR glib.h
+    PATHS /opt/raspi_sysroot/usr/include/glib-2.0
+)
+find_path(GLIBCONFIG_INCLUDE_DIR glibconfig.h
+    PATHS /opt/raspi_sysroot/usr/lib/aarch64-linux-gnu/glib-2.0/include
+)
+# --- GStreamer libraries ---
+find_library(GSTREAMER_LIBRARY gstreamer-1.0
+    PATHS /opt/raspi_sysroot/usr/lib/aarch64-linux-gnu
+)
+find_library(GST_BASE_LIBRARY gstbase-1.0
+    PATHS /opt/raspi_sysroot/usr/lib/aarch64-linux-gnu
+)
+
+find_library(GOBJECT_LIB
+    NAMES gobject-2.0
+    PATHS ${CMAKE_SYSROOT}/usr/lib/aarch64-linux-gnu
+    NO_DEFAULT_PATH
+)
+find_library(GLIB_LIB
+    NAMES glib-2.0
+    PATHS ${CMAKE_SYSROOT}/usr/lib/aarch64-linux-gnu
+    NO_DEFAULT_PATH
+)
+
+find_library(GST_APP_LIBRARY gstapp-1.0
+    PATHS /opt/raspi_sysroot/usr/lib/aarch64-linux-gnu
+)
+
+# 検出結果をログに表示
+message(STATUS "Found GLib: ${GLIB_LIB}")
+message(STATUS "Found GObject: ${GOBJECT_LIB}")
+
 # 見つけたヘッダパスをコンパイラに教える
-include_directories(${GLES2_INCLUDE_DIR} ${EGL_INCLUDE_DIR} ${DRM_INCLUDE_DIR})
+include_directories(
+    include
+    src
+    ${GLES2_INCLUDE_DIR}
+    ${EGL_INCLUDE_DIR}
+    ${DRM_INCLUDE_DIR}
+    ${GSTREAMER_INCLUDE_DIR}
+    ${GLIB_INCLUDE_DIR}
+    ${GLIBCONFIG_INCLUDE_DIR}
+)
+
 
 # 見つけたライブラリをリンカで使うためにリスト化する
 set(REQUIRED_LIBRARIES
@@ -33,6 +80,11 @@ set(REQUIRED_LIBRARIES
     ${EGL_LIBRARY}
     ${DRM_LIBRARY}
     ${GBM_LIBRARY}
+    ${GSTREAMER_LIBRARY}
+    ${GST_BASE_LIBRARY}
+    ${GST_APP_LIBRARY}
+    ${GOBJECT_LIB}
+    ${GLIB_LIB}
     m # 数学ライブラリ
 )
 
@@ -51,6 +103,7 @@ add_executable(${TARGET_EXEC}
     src/Application.cpp
     src/GraphicsPlatform.cpp
     src/Renderer.cpp
+    src/GStreamerSupport.cpp       # ← 追加
 )
 
 # 実行ファイルに必要なライブラリをリンクする

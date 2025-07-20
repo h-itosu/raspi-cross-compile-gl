@@ -1,44 +1,60 @@
 /**
  * @file Application.cpp
- * @brief アプリケーション全体を管理するクラスの実装
+ * @brief アプリケーション全体を管理するクラスの実装（YUV対応）
  */
 #include "Application.h"
-#include <unistd.h> // usleepのため
+#include "GStreamerSupport.h"
+#include <iostream>
+#include <unistd.h> // usleep
+
+#include "FPSCounter.h"
 
 Application::Application() {}
-Application::~Application() {}
 
-/**
- * @brief アプリケーションの初期化
- * プラットフォーム(ハードウェア) -> レンダラー(描画) の順で初期化を行う
- */
-bool Application::initialize() {
-    if (!platform_.initialize()) {
+Application::~Application()
+{
+    gstreamer_.finalize();
+    renderer_.shutdown();
+    platform_.shutdown();
+}
+
+bool Application::initialize()
+{
+    if (!gstreamer_.initialize())
         return false;
-    }
-    if (!renderer_.initialize()) {
+    if (!platform_.initialize())
         return false;
-    }
+    if (!renderer_.initialize())
+        return false;
     return true;
 }
 
-/**
- * @brief メインループの実行
- * 決められたフレーム数だけループし、アニメーションを行う
- */
-void Application::run() {
-    float angle = 0.0f;
-    for (int i = 0; i < 600; ++i) { // 60fpsで約10秒間
-        // 1. 描画処理を呼び出す
-        renderer_.render(angle, platform_.getScreenWidth(), platform_.getScreenHeight());
-
-        // 2. 描画結果を画面に反映させる
-        platform_.swapBuffers();
-
-        // 3. 次のフレームのために角度を更新
-        angle += 1.0f;
-
-        // 4. 約60fpsになるように少し待機
-        usleep(16666);
+void Application::run()
+{
+    if (!gstreamer_.startPipeline("sample.mp4"))
+    {
+        std::cerr << "Failed to start GStreamer pipeline." << std::endl;
+        return;
     }
+
+    FPSCounter fpsCounter;
+
+    for (int i = 0; i < 300; ++i) // 約5秒再生（60fps換算）
+    {
+        GStreamerSupport::FrameData frame;
+        if (gstreamer_.getFrameData(frame))
+        {
+            int ySize = frame.width * frame.height;
+            int uSize = (frame.width / 2) * (frame.height / 2);
+            renderer_.uploadYUVTextures(frame.buffer.data(), frame.width, frame.height, ySize, uSize);
+
+            renderer_.renderYUV(platform_.getScreenWidth(), platform_.getScreenHeight());
+            platform_.swapBuffers();
+        }
+
+        //        usleep(16000);      // 約60fps想定
+        fpsCounter.frame(); // FPSカウンターを更新
+    }
+
+    std::cout << "Playback finished." << std::endl;
 }

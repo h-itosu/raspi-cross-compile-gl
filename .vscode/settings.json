@@ -47,13 +47,18 @@
         "stdexcept": "cpp",
         "streambuf": "cpp",
         "cinttypes": "cpp",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "cstring": "cpp",
+        "chrono": "cpp",
+        "ctime": "cpp",
+        "ratio": "cpp",
+        "sstream": "cpp"
     },
 
     // -------------------------------------------------------------------------
     // チームでのコーディングスタイル統一のための設定
     // -------------------------------------------------------------------------
-    
+
     // C/C++ファイルに対する設定
     "[cpp]": {
         // デフォルトのフォーマッターとしてMSのC/C++拡張機能を使用
@@ -66,16 +71,16 @@
         "editor.defaultFormatter": "ms-vscode.cpptools",
         "editor.formatOnSave": true
     },
-    
+
     // ファイル末尾の不要な空白を保存時に自動削除
     "files.trimTrailingWhitespace": true,
-    
+
     // ファイルの最終行に必ず改行を入れる
     "files.insertFinalNewline": true,
-    
+
     // タブキーを押した際に、タブ文字の代わりにスペースを挿入
     "editor.insertSpaces": true,
-    
+
     // タブの幅をスペース4つ分に設定
     "editor.tabSize": 4
 }
