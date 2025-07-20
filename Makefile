@@ -41,8 +41,9 @@ NC            := \033[0m # No Color
 SSHPASS_CMD   := sshpass -p '$(RASPI_PW)'
 SCP_CMD       := $(SSHPASS_CMD) scp -o StrictHostKeyChecking=no
 SSH_CMD       := $(SSHPASS_CMD) ssh -o StrictHostKeyChecking=no $(RASPI_USER)@$(RASPI_HOST)
-CMAKE_CONFIGURE_CMD := cmake -B $(BUILD_DIR) -S . -G Ninja -DCMAKE_TOOLCHAIN_FILE=.devcontainer/aarch64-linux-gnu.cmake
-
+CMAKE_CONFIGURE_CMD := cmake -B $(BUILD_DIR) -S . -G Ninja \
+    -DCMAKE_TOOLCHAIN_FILE=.devcontainer/aarch64-linux-gnu.cmake \
+    -DTARGET_EXEC=$(TARGET_EXEC)
 
 # --- ターゲット定義 ---
 # .PHONY: これらはファイル名ではなく、命令の別名(エイリアス)であることを示す

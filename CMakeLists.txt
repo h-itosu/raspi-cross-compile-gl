@@ -41,9 +41,12 @@ if(NOT DRM_INCLUDE_DIR OR NOT DRM_LIBRARY OR NOT GBM_LIBRARY)
     message(FATAL_ERROR "DRM or GBM library/headers not found.")
 endif()
 
+# デフォルト値 "raspi_gl_hello" を設定可能に
+set(TARGET_EXEC "raspi_gl_hello" CACHE STRING "Executable name")
+
 # --- 実行ファイルの定義 ---
 # 実行ファイル名と、それに必要なソースファイル群を指定する
-add_executable(raspi_gl_hello
+add_executable(${TARGET_EXEC}
     src/main.cpp
     src/Application.cpp
     src/GraphicsPlatform.cpp
@@ -51,4 +54,4 @@ add_executable(raspi_gl_hello
 )
 
 # 実行ファイルに必要なライブラリをリンクする
-target_link_libraries(raspi_gl_hello PRIVATE ${REQUIRED_LIBRARIES})
+target_link_libraries(${TARGET_EXEC} PRIVATE ${REQUIRED_LIBRARIES})
