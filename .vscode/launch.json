@@ -1,0 +1,38 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            // デバッグ構成の名前
+            "name": "Remote Debug Raspberry Pi",
+            // デバッガの種類
+            "type": "cppdbg",
+            // デバッグセッションの開始を要求
+            "request": "launch",
+            // デバッグ対象のプログラムパス
+            // ${workspaceFolder}: コンテナ内の/workspace
+            // ${env:TARGET_EXEC}: .envから読み込んだ実行ファイル名
+            "program": "${workspaceFolder}/build/${env:TARGET_EXEC}",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            // GDBを使用する
+            "MIMode": "gdb",
+            // 使用するデバッガプログラムのパス
+            "miDebuggerPath": "/usr/bin/gdb-multiarch",
+            // 接続するリモートGDBサーバーのアドレス
+            // ${env:RASPI_HOST}と${env:RASPI_DEBUG_PORT}は.envから読み込まれる
+            "miDebuggerServerAddress": "${env:RASPI_HOST}:${env:RASPI_DEBUG_PORT}",
+            // デバッグ時にライブラリのシンボルを解決するためのSysrootパス
+            "sysroot": "/opt/raspi_sysroot",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}

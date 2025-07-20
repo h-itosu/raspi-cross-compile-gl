@@ -1,0 +1,81 @@
+{
+    // -------------------------------------------------------------------------
+    // C/C++拡張機能が自動生成した、IntelliSense（入力補完）用の設定
+    // -------------------------------------------------------------------------
+    // 拡張子のない標準ライブラリヘッダをC++として認識させる
+    "files.associations": {
+        "array": "cpp",
+        "atomic": "cpp",
+        "bit": "cpp",
+        "cctype": "cpp",
+        "clocale": "cpp",
+        "cmath": "cpp",
+        "compare": "cpp",
+        "concepts": "cpp",
+        "cstdarg": "cpp",
+        "cstddef": "cpp",
+        "cstdint": "cpp",
+        "cstdio": "cpp",
+        "cstdlib": "cpp",
+        "cwchar": "cpp",
+        "cwctype": "cpp",
+        "deque": "cpp",
+        "string": "cpp",
+        "unordered_map": "cpp",
+        "vector": "cpp",
+        "exception": "cpp",
+        "algorithm": "cpp",
+        "functional": "cpp",
+        "iterator": "cpp",
+        "memory": "cpp",
+        "memory_resource": "cpp",
+        "numeric": "cpp",
+        "random": "cpp",
+        "string_view": "cpp",
+        "system_error": "cpp",
+        "tuple": "cpp",
+        "type_traits": "cpp",
+        "utility": "cpp",
+        "initializer_list": "cpp",
+        "iosfwd": "cpp",
+        "iostream": "cpp",
+        "istream": "cpp",
+        "limits": "cpp",
+        "new": "cpp",
+        "numbers": "cpp",
+        "ostream": "cpp",
+        "stdexcept": "cpp",
+        "streambuf": "cpp",
+        "cinttypes": "cpp",
+        "typeinfo": "cpp"
+    },
+
+    // -------------------------------------------------------------------------
+    // チームでのコーディングスタイル統一のための設定
+    // -------------------------------------------------------------------------
+    
+    // C/C++ファイルに対する設定
+    "[cpp]": {
+        // デフォルトのフォーマッターとしてMSのC/C++拡張機能を使用
+        "editor.defaultFormatter": "ms-vscode.cpptools",
+        // ファイル保存時に自動でフォーマットをかける
+        "editor.formatOnSave": true
+    },
+    // Cファイルのフォーマット設定
+    "[c]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools",
+        "editor.formatOnSave": true
+    },
+    
+    // ファイル末尾の不要な空白を保存時に自動削除
+    "files.trimTrailingWhitespace": true,
+    
+    // ファイルの最終行に必ず改行を入れる
+    "files.insertFinalNewline": true,
+    
+    // タブキーを押した際に、タブ文字の代わりにスペースを挿入
+    "editor.insertSpaces": true,
+    
+    // タブの幅をスペース4つ分に設定
+    "editor.tabSize": 4
+}
