@@ -66,6 +66,7 @@ void Renderer::uploadYUVTextures(const uint8_t *data, int width, int height, int
     const uint8_t *uPlane = data + ySize;
     const uint8_t *vPlane = data + ySize + uSize;
 
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glBindTexture(GL_TEXTURE_2D, texY_);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, width, height,
                  0, GL_LUMINANCE, GL_UNSIGNED_BYTE, yPlane);
@@ -97,8 +98,8 @@ void Renderer::renderYUV(uint32_t width, uint32_t height)
     const GLushort indices[] = {0, 1, 2, 0, 2, 3};
 
     glViewport(0, 0, width, height);
-    glClearColor(0, 0, 0, 1);
-    glClear(GL_COLOR_BUFFER_BIT);
+    //    glClearColor(0, 0, 0, 1);
+    //    glClear(GL_COLOR_BUFFER_BIT);
 
     glUseProgram(programYUV_);
 

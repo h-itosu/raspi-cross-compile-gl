@@ -21,13 +21,19 @@ void GStreamerSupport::finalize()
 bool GStreamerSupport::startPipeline(const char *filepath)
 {
     std::string pipelineDesc = std::string("filesrc location=") + filepath +
-                               " ! decodebin ! videoconvert ! video/x-raw,format=I420 ! appsink name=mysink";
+                               " ! qtdemux name=demux "
+                               " demux.video_0 ! queue "
+                               " ! h264parse ! v4l2h264dec "
+                               " ! queue "
+                               " ! v4l2convert output-io-mode=dmabuf-import "
+                               " ! video/x-raw,format=I420 "
+                               " ! appsink name=mysink sync=false";
 
     GError *error = nullptr;
     pipeline_ = gst_parse_launch(pipelineDesc.c_str(), &error);
     if (!pipeline_)
     {
-        std::cerr << "Failed to create pipeline: " << error->message << std::endl;
+        std::cerr << "[GStreamer] Failed to create pipeline: " << error->message << std::endl;
         g_error_free(error);
         return false;
     }
@@ -35,13 +41,14 @@ bool GStreamerSupport::startPipeline(const char *filepath)
     appsink_ = gst_bin_get_by_name(GST_BIN(pipeline_), "mysink");
     if (!appsink_)
     {
-        std::cerr << "Failed to get appsink." << std::endl;
+        std::cerr << "[GStreamer] Failed to get appsink." << std::endl;
         return false;
     }
 
-    gst_app_sink_set_emit_signals((GstAppSink *)appsink_, false);
-    gst_app_sink_set_drop((GstAppSink *)appsink_, true);
-    gst_app_sink_set_max_buffers((GstAppSink *)appsink_, 1);
+    gst_app_sink_set_emit_signals(GST_APP_SINK(appsink_), false);
+    gst_app_sink_set_drop(GST_APP_SINK(appsink_), true); // drop有効化！
+    gst_app_sink_set_max_buffers(GST_APP_SINK(appsink_), 20);
+    g_object_set(G_OBJECT(appsink_), "sync", FALSE, nullptr);
 
     gst_element_set_state(pipeline_, GST_STATE_PLAYING);
     return true;
@@ -52,29 +59,52 @@ bool GStreamerSupport::getFrameData(FrameData &outFrame)
     if (!appsink_)
         return false;
 
-    GstSample *sample = gst_app_sink_try_pull_sample(GST_APP_SINK(appsink_), 10000000); // 10ms timeout
+    GstSample *sample = gst_app_sink_try_pull_sample(GST_APP_SINK(appsink_), 10000000); // 10ms
     if (!sample)
+    {
+        if (gst_app_sink_is_eos(GST_APP_SINK(appsink_)))
+        {
+            std::cerr << "[GStreamer] End of stream reached (EOS)." << std::endl;
+        }
+        else
+        {
+            std::cerr << "[GStreamer] Failed to pull sample (timeout or not ready)." << std::endl;
+        }
         return false;
+    }
 
+    GstBuffer *buffer = gst_sample_get_buffer(sample);
     GstCaps *caps = gst_sample_get_caps(sample);
+    if (!buffer || !caps)
+    {
+        gst_sample_unref(sample);
+        return false;
+    }
+
     GstStructure *s = gst_caps_get_structure(caps, 0);
     gst_structure_get_int(s, "width", &outFrame.width);
     gst_structure_get_int(s, "height", &outFrame.height);
 
-    GstBuffer *buffer = gst_sample_get_buffer(sample);
-    GstMapInfo map;
-    if (gst_buffer_map(buffer, &map, GST_MAP_READ))
+    if (!gst_buffer_map(buffer, &outFrame.map, GST_MAP_READ))
     {
-        size_t ySize = outFrame.width * outFrame.height;
-        size_t uSize = (outFrame.width / 2) * (outFrame.height / 2);
-        size_t total = ySize + uSize * 2;
-
-        outFrame.buffer.resize(total);
-        std::memcpy(outFrame.buffer.data(), map.data, total);
-
-        gst_buffer_unmap(buffer, &map);
+        gst_sample_unref(sample);
+        return false;
     }
 
-    gst_sample_unref(sample);
+    outFrame.data = outFrame.map.data;
+    outFrame.sample = sample;
+    // stride を取得したい場合は caps から取り出す（必要なら）
     return true;
+}
+
+void GStreamerSupport::releaseFrame(FrameData &frame)
+{
+    if (frame.sample)
+    {
+        GstBuffer *buffer = gst_sample_get_buffer(frame.sample);
+        gst_buffer_unmap(buffer, &frame.map);
+        gst_sample_unref(frame.sample);
+        frame.sample = nullptr;
+        frame.data = nullptr;
+    }
 }

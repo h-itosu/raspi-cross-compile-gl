@@ -32,7 +32,7 @@ public:
     /**
      * @brief アプリケーションのメインループを開始する。
      */
-    void run();
+    bool run();
 
 private:
     GStreamerSupport gstreamer_; ///< GStreamerサポートのインスタンス

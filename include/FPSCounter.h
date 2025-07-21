@@ -13,8 +13,8 @@ public:
     {
         frameCount_++;
         auto now = std::chrono::steady_clock::now();
-        std::chrono::duration<double> elapsed = now - lastTime_;
-        if (elapsed.count() >= 1.0)
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTime_).count();
+        if (duration >= 1000)
         {
             std::cout << "[FPS] " << frameCount_ << " fps" << std::endl;
             frameCount_ = 0;
