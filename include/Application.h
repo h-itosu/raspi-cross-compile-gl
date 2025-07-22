@@ -9,6 +9,7 @@
 #include "GStreamerSupport.h"
 #include "GraphicsPlatform.h"
 #include "Renderer.h"
+#include "TelopRenderer.h"
 
 /**
  * @class Application

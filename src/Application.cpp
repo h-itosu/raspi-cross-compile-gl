@@ -1,8 +1,11 @@
 #include "Application.h"
 #include "GStreamerSupport.h"
 #include "FPSCounter.h"
+#include "TelopRenderer.h"
 #include <iostream>
 #include <unistd.h>
+#include <termios.h>
+#include <fcntl.h>
 
 Application::Application() {}
 
@@ -13,11 +16,56 @@ Application::~Application()
     platform_.shutdown();
 }
 
+TelopRenderer telopRenderer;
+
 bool Application::initialize()
 {
-    return gstreamer_.initialize() &&
-           platform_.initialize() &&
-           renderer_.initialize();
+    if (!gstreamer_.initialize() ||
+        !platform_.initialize() ||
+        !renderer_.initialize())
+    {
+        return false;
+    }
+
+    if (!telopRenderer.initialize("/usr/share/fonts/truetype/vlgothic/VL-Gothic-Regular.ttf"))
+    {
+        std::cerr << "Failed to initialize TelopRenderer" << std::endl;
+        return false;
+    }
+
+    // アウトライン描画を有効化（シェーダー側対応）
+    telopRenderer.setOutline(true);                        // フラグのみセット、描画はシェーダーで対応
+    telopRenderer.setOutlineColor(0.0f, 0.0f, 0.0f, 1.0f); // 黒色アウトライン
+    telopRenderer.setOutlineWidth(0.05f);                  // ピクセル単位の太さ
+
+    return true;
+}
+
+static bool kbhit()
+{
+    struct termios oldt, newt;
+    int ch;
+    int oldf;
+
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+
+    ch = getchar();
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    fcntl(STDIN_FILENO, F_SETFL, oldf);
+
+    if (ch != EOF)
+    {
+        ungetc(ch, stdin);
+        return true;
+    }
+
+    return false;
 }
 
 bool Application::run()
@@ -38,7 +86,7 @@ bool Application::run()
             std::cout << "[App] First frame received." << std::endl;
             break;
         }
-        usleep(1000); // 1ms
+        usleep(1000);
     }
 
     if (retries <= 0)
@@ -50,9 +98,18 @@ bool Application::run()
     FPSCounter fpsCounter;
     int failCount = 0;
 
-    for (int i = 0; i < 300; ++i)
+    while (true)
     {
-        GStreamerSupport::FrameData frame;
+        if (kbhit())
+        {
+            int ch = getchar();
+            if (ch == 27) // ESC key
+            {
+                std::cout << "ESC pressed. Exiting..." << std::endl;
+                break;
+            }
+        }
+
         if (gstreamer_.getFrameData(frame))
         {
             int ySize = frame.width * frame.height;
@@ -60,23 +117,33 @@ bool Application::run()
 
             renderer_.uploadYUVTextures(frame.data, frame.width, frame.height, ySize, uSize);
             renderer_.renderYUV(platform_.getScreenWidth(), platform_.getScreenHeight());
+
+            telopRenderer.update();
+            telopRenderer.render();
+
             platform_.swapBuffers();
 
             fpsCounter.frame();
-            failCount = 0; // 成功したらリセット
+            failCount = 0;
 
-            // ★★★ メモリリーク防止：必ず解放！
             gstreamer_.releaseFrame(frame);
         }
         else
         {
-            if (++failCount % 10 == 0)
+            if (++failCount > 60)
+            {
+                std::cout << "End of stream detected. Restarting pipeline..." << std::endl;
+                gstreamer_.restartPipeline("sample.mp4");
+                failCount = 0;
+            }
+            else if (failCount % 10 == 0)
             {
                 std::cerr << "[App] No frame yet (" << failCount << " fails)" << std::endl;
             }
-            usleep(1000); // 1ms待機してリトライ
+            usleep(1000);
         }
     }
+
     std::cout << "Playback finished." << std::endl;
     return true;
 }

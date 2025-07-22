@@ -52,7 +52,10 @@
         "chrono": "cpp",
         "ctime": "cpp",
         "ratio": "cpp",
-        "sstream": "cpp"
+        "sstream": "cpp",
+        "codecvt": "cpp",
+        "map": "cpp",
+        "fstream": "cpp"
     },
 
     // -------------------------------------------------------------------------

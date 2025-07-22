@@ -63,6 +63,7 @@ build:
 deploy: build
 	@echo "--- Deploying to $(RASPI_HOST) ---"
 	@$(SCP_CMD) $(EXECUTABLE) $(RASPI_USER)@$(RASPI_HOST):$(REMOTE_DIR)/
+	@$(SCP_CMD) -r ./shaders $(RASPI_USER)@$(RASPI_HOST):$(REMOTE_DIR)/
 	@echo -e "$(GREEN)--- Deploy Successful! ---$(NC)"
 
 # Raspberry Pi上での実行

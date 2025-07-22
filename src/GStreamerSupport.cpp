@@ -47,11 +47,19 @@ bool GStreamerSupport::startPipeline(const char *filepath)
 
     gst_app_sink_set_emit_signals(GST_APP_SINK(appsink_), false);
     gst_app_sink_set_drop(GST_APP_SINK(appsink_), true); // drop有効化！
-    gst_app_sink_set_max_buffers(GST_APP_SINK(appsink_), 20);
+    gst_app_sink_set_max_buffers(GST_APP_SINK(appsink_), 10);
     g_object_set(G_OBJECT(appsink_), "sync", FALSE, nullptr);
 
     gst_element_set_state(pipeline_, GST_STATE_PLAYING);
     return true;
+}
+
+bool GStreamerSupport::restartPipeline(const char *filepath)
+{
+    finalize();
+    if (!initialize())
+        return false;
+    return startPipeline(filepath);
 }
 
 bool GStreamerSupport::getFrameData(FrameData &outFrame)
@@ -64,11 +72,11 @@ bool GStreamerSupport::getFrameData(FrameData &outFrame)
     {
         if (gst_app_sink_is_eos(GST_APP_SINK(appsink_)))
         {
-            std::cerr << "[GStreamer] End of stream reached (EOS)." << std::endl;
+            //            std::cerr << "[GStreamer] End of stream reached (EOS)." << std::endl;
         }
         else
         {
-            std::cerr << "[GStreamer] Failed to pull sample (timeout or not ready)." << std::endl;
+            //            std::cerr << "[GStreamer] Failed to pull sample (timeout or not ready)." << std::endl;
         }
         return false;
     }

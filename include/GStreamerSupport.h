@@ -18,6 +18,7 @@ public:
     bool initialize();
     void finalize();
     bool startPipeline(const char *filepath);
+    bool restartPipeline(const char *filepath);
 
     struct FrameData
     {

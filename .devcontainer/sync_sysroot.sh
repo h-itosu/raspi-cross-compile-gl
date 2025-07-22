@@ -44,12 +44,27 @@ mkdir -p ${SYSROOT_DIR}
 for dir in "${SYNC_DIRS[@]}"; do
     echo "Syncing ${dir}..."
     mkdir -p "${SYSROOT_DIR}${dir}"
-    
+
     # sshpassでパスワードを渡し、rsyncを実行
     # --rsync-path="sudo rsync": RasPi側でシステムディレクトリを読むためにsudo権限でrsyncを実行させる
     sshpass -p "${RASPI_PW}" rsync -avz --delete --rsync-path="sudo rsync" \
         -e "ssh ${SSH_OPTS}" \
         "${RASPI_USER}@${RASPI_HOST}:${dir}" "${SYSROOT_DIR}${dir}"
 done
+
+# --- 追加: FreeType の個別同期 ---
+echo "Syncing FreeType headers and libraries..."
+
+# FreeType headers
+sshpass -p "${RASPI_PW}" rsync -avz --delete --rsync-path="sudo rsync" \
+    -e "ssh ${SSH_OPTS}" \
+    "${RASPI_USER}@${RASPI_HOST}:/usr/include/freetype2" \
+    "${SYSROOT_DIR}/usr/include/"
+
+# FreeType libs
+sshpass -p "${RASPI_PW}" rsync -avz --delete --rsync-path="sudo rsync" \
+    -e "ssh ${SSH_OPTS}" \
+    "${RASPI_USER}@${RASPI_HOST}:/usr/lib/aarch64-linux-gnu/libfreetype*" \
+    "${SYSROOT_DIR}/usr/lib/aarch64-linux-gnu/"
 
 echo "--- Sysroot Sync Complete. Location: ${SYSROOT_DIR} ---"

@@ -18,6 +18,7 @@ include_directories(include)
 find_path(GLES2_INCLUDE_DIR NAMES GLES2/gl2.h)
 find_path(EGL_INCLUDE_DIR NAMES EGL/egl.h)
 find_path(DRM_INCLUDE_DIR NAMES drm.h HINTS /usr/include/libdrm /usr/include)
+find_path(FRTP_INCLUDE_DIR NAMES ft2build.h HINTS /opt/raspi_sysroot/usr/include/freetype2)
 
 find_library(GLESV2_LIBRARY NAMES GLESv2 HINTS /usr/lib/aarch64-linux-gnu)
 find_library(EGL_LIBRARY NAMES EGL HINTS /usr/lib/aarch64-linux-gnu)
@@ -57,6 +58,11 @@ find_library(GST_APP_LIBRARY gstapp-1.0
     PATHS /opt/raspi_sysroot/usr/lib/aarch64-linux-gnu
 )
 
+find_library(FRTP_LIBRARY
+    NAMES libfreetype.so
+    PATHS /opt/raspi_sysroot/usr/lib/aarch64-linux-gnu
+)
+
 # 検出結果をログに表示
 message(STATUS "Found GLib: ${GLIB_LIB}")
 message(STATUS "Found GObject: ${GOBJECT_LIB}")
@@ -68,6 +74,7 @@ include_directories(
     ${GLES2_INCLUDE_DIR}
     ${EGL_INCLUDE_DIR}
     ${DRM_INCLUDE_DIR}
+    ${FRTP_INCLUDE_DIR}
     ${GSTREAMER_INCLUDE_DIR}
     ${GLIB_INCLUDE_DIR}
     ${GLIBCONFIG_INCLUDE_DIR}
@@ -85,6 +92,7 @@ set(REQUIRED_LIBRARIES
     ${GST_APP_LIBRARY}
     ${GOBJECT_LIB}
     ${GLIB_LIB}
+    ${FRTP_LIBRARY}
     m # 数学ライブラリ
 )
 
@@ -103,7 +111,9 @@ add_executable(${TARGET_EXEC}
     src/Application.cpp
     src/GraphicsPlatform.cpp
     src/Renderer.cpp
-    src/GStreamerSupport.cpp       # ← 追加
+    src/GStreamerSupport.cpp
+    src/TelopRenderer.cpp
+    src/ShaderUtils.cpp
 )
 
 # 実行ファイルに必要なライブラリをリンクする
