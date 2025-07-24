@@ -54,10 +54,26 @@ bool Renderer::initialize()
 
 void Renderer::shutdown()
 {
-    glDeleteTextures(1, &texY_);
-    glDeleteTextures(1, &texU_);
-    glDeleteTextures(1, &texV_);
-    glDeleteProgram(programYUV_);
+    if (texY_)
+    {
+        glDeleteTextures(1, &texY_);
+        texY_ = 0;
+    }
+    if (texU_)
+    {
+        glDeleteTextures(1, &texU_);
+        texU_ = 0;
+    }
+    if (texV_)
+    {
+        glDeleteTextures(1, &texV_);
+        texV_ = 0;
+    }
+    if (programYUV_)
+    {
+        glDeleteProgram(programYUV_);
+        programYUV_ = 0;
+    }
 }
 
 void Renderer::uploadYUVTextures(const uint8_t *data, int width, int height, int ySize, int uSize)

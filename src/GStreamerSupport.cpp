@@ -16,6 +16,11 @@ void GStreamerSupport::finalize()
         gst_object_unref(pipeline_);
         pipeline_ = nullptr;
     }
+    if (appsink_)
+    {
+        gst_object_unref(appsink_);
+        appsink_ = nullptr;
+    }
 }
 
 bool GStreamerSupport::startPipeline(const char *filepath)
@@ -102,6 +107,43 @@ bool GStreamerSupport::getFrameData(FrameData &outFrame)
     outFrame.data = outFrame.map.data;
     outFrame.sample = sample;
     // stride を取得したい場合は caps から取り出す（必要なら）
+    return true;
+}
+
+bool GStreamerSupport::checkBusMessages()
+{
+    if (!pipeline_)
+        return false;
+
+    GstBus *bus = gst_element_get_bus(pipeline_);
+    GstMessage *msg = gst_bus_timed_pop_filtered(bus, 0,
+                                                 static_cast<GstMessageType>(GST_MESSAGE_EOS | GST_MESSAGE_ERROR));
+
+    if (msg)
+    {
+        switch (GST_MESSAGE_TYPE(msg))
+        {
+        case GST_MESSAGE_EOS:
+            std::cout << "[GStreamer] EOS detected. Restarting..." << std::endl;
+            //            if (callback_) callback_(callClass_);
+            gst_element_seek(pipeline_,
+                             1.0, // 再生速度
+                             GST_FORMAT_TIME,
+                             (GstSeekFlags)(GST_SEEK_FLAG_FLUSH | GST_SEEK_FLAG_KEY_UNIT),
+                             GST_SEEK_TYPE_SET,
+                             0, // 先頭にシーク
+                             GST_SEEK_TYPE_NONE,
+                             GST_CLOCK_TIME_NONE);
+            break;
+        case GST_MESSAGE_ERROR:
+            std::cerr << "[GStreamer] Error occurred." << std::endl;
+            break;
+        default:
+            break;
+        }
+        gst_message_unref(msg);
+    }
+    gst_object_unref(bus);
     return true;
 }
 

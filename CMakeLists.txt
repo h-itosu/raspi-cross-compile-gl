@@ -114,6 +114,7 @@ add_executable(${TARGET_EXEC}
     src/GStreamerSupport.cpp
     src/TelopRenderer.cpp
     src/ShaderUtils.cpp
+    src/Util.cpp
 )
 
 # 実行ファイルに必要なライブラリをリンクする

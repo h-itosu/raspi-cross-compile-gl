@@ -2,6 +2,7 @@
 #include "GStreamerSupport.h"
 #include "FPSCounter.h"
 #include "TelopRenderer.h"
+#include "Util.h"
 #include <iostream>
 #include <unistd.h>
 #include <termios.h>
@@ -70,6 +71,12 @@ static bool kbhit()
 
 bool Application::run()
 {
+    // coutにシステムのロケールを設定して3桁区切りを有効にする
+    std::cout.imbue(std::locale(""));
+
+    util timer;
+    timer.StartTimer();
+
     if (!gstreamer_.startPipeline("sample.mp4"))
     {
         std::cerr << "Failed to start GStreamer pipeline." << std::endl;
@@ -110,6 +117,12 @@ bool Application::run()
             }
         }
 
+        if (!gstreamer_.checkBusMessages())
+        {
+            std::cerr << "[App] Error checking GStreamer bus messages." << std::endl;
+            break;
+        }
+
         if (gstreamer_.getFrameData(frame))
         {
             int ySize = frame.width * frame.height;
@@ -123,20 +136,27 @@ bool Application::run()
 
             platform_.swapBuffers();
 
-            fpsCounter.frame();
+            if (fpsCounter.frame())
+            {
+                // 2. 残りメモリの取得と表示
+                util::LogAvailableMemory();
+                timer.LogElapsedTimeHMS();
+            }
             failCount = 0;
 
             gstreamer_.releaseFrame(frame);
         }
         else
         {
+            /*
             if (++failCount > 60)
             {
                 std::cout << "End of stream detected. Restarting pipeline..." << std::endl;
                 gstreamer_.restartPipeline("sample.mp4");
                 failCount = 0;
             }
-            else if (failCount % 10 == 0)
+            else*/
+            if (failCount % 10 == 0)
             {
                 std::cerr << "[App] No frame yet (" << failCount << " fails)" << std::endl;
             }

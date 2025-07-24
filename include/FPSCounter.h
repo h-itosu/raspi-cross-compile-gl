@@ -9,7 +9,7 @@ class FPSCounter
 public:
     FPSCounter() : frameCount_(0), lastTime_(std::chrono::steady_clock::now()) {}
 
-    void frame()
+    bool frame()
     {
         frameCount_++;
         auto now = std::chrono::steady_clock::now();
@@ -19,7 +19,9 @@ public:
             std::cout << "[FPS] " << frameCount_ << " fps" << std::endl;
             frameCount_ = 0;
             lastTime_ = now;
+            return true; // 1秒経過してFPSを出力した
         }
+        return false; // まだ1秒経過していない
     }
 
 private:

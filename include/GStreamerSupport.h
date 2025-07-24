@@ -31,6 +31,7 @@ public:
     };
 
     bool getFrameData(FrameData &outFrame);
+    bool checkBusMessages();
     void releaseFrame(FrameData &frame);
 
 private:
