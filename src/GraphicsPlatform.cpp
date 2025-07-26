@@ -13,6 +13,11 @@ GraphicsPlatform::~GraphicsPlatform()
     shutdown();
 }
 
+/// @brief グラフィックス環境を初期化する
+/// @note この関数は、DRM/KMS、GBM、EGLのリソースを初期化します。
+///       DRM/KMSを使用して、ディスプレイの情報を取得し、GBMを使用してサーフェスを作成します。
+///       EGLを使用して、OpenGL ESの描画コンテキストを作成します。
+/// @return
 bool GraphicsPlatform::initialize()
 {
     // 1. 利用可能なDRMデバイスを開く
@@ -33,6 +38,7 @@ bool GraphicsPlatform::initialize()
         }
     }
 
+    // DRMリソースが取得できなかった場合はエラー
     if (drm_fd_ < 0 || !drm_resources_)
     {
         std::cerr << "Error: Could not get DRM resources from any device." << std::endl;
@@ -53,6 +59,7 @@ bool GraphicsPlatform::initialize()
             drmModeFreeConnector(connector);
     }
 
+    // コネクタが見つからなかった場合はエラー
     if (!drm_connector_)
     {
         std::cerr << "Error: No connected connector found." << std::endl;
@@ -190,6 +197,14 @@ bool GraphicsPlatform::initialize()
     std::cout << "Graphics platform initialized successfully." << std::endl;
     return true;
 }
+
+/// @brief 確保したグラフィックスリソースを全て解放する
+/// @note この関数は、EGL、GBM、DRM/KMSのリソースを解放します。
+///       swapBuffers()を呼び出す前に
+///       initialize()を呼び出して、必要なリソースを確保しておく必要があります。
+///       また、描画内容はOpenGL ESで行われている前提です。
+///       この関数は、デストラクタで自動的に呼び出されます。
+///       そのため、明示的に呼び出す必要はありません。
 void GraphicsPlatform::shutdown()
 {
     if (original_crtc_)
@@ -252,6 +267,11 @@ void GraphicsPlatform::shutdown()
     }
 }
 
+/// @brief バックバッファとフロントバッファを交換し、描画内容を画面に表示する
+/// @note この関数は、EGLとGBMを使用して描画内容を画面に表示します。
+///       DRM/KMSを使用して、フレームバッファをディスプレイに設定します。
+///       事前にinitialize()を呼び出して、必要なリソースを確保しておく必要があります。
+///       また、描画内容はOpenGL ESで行われている前提です
 void GraphicsPlatform::swapBuffers()
 {
     eglSwapBuffers(display_, surface_);
@@ -283,6 +303,8 @@ void GraphicsPlatform::swapBuffers()
     previous_fb_id_ = fb_id;
 }
 
+/// @brief フレームバッファをPNG形式で保存する
+/// @param filename 保存するファイル名
 void GraphicsPlatform::saveFramebufferToPNG(const char *filename)
 {
     int width = mode_info_.hdisplay;
@@ -334,5 +356,71 @@ void GraphicsPlatform::saveFramebufferToPNG(const char *filename)
     png_destroy_write_struct(&png, &info);
 }
 
+/// @brief ピクセルデータをPNG形式で保存する
+/// @param filename 保存するファイル名
+/// @param data ピクセルデータ（RGBA形式）
+/// @return
+bool GraphicsPlatform::savePixelsToPNG(const char *filename, const unsigned char *data)
+{
+    int width = mode_info_.hdisplay;
+    int height = mode_info_.vdisplay;
+
+    FILE *fp = fopen(filename, "wb");
+    if (!fp)
+    {
+        std::cerr << "[GraphicsPlatform] Failed to open file for writing: " << filename << std::endl;
+        return false;
+    }
+
+    png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+    if (!png)
+    {
+        fclose(fp);
+        std::cerr << "[GraphicsPlatform] Failed to create PNG write struct" << std::endl;
+        return false;
+    }
+
+    png_infop info = png_create_info_struct(png);
+    if (!info)
+    {
+        png_destroy_write_struct(&png, nullptr);
+        fclose(fp);
+        std::cerr << "[GraphicsPlatform] Failed to create PNG info struct" << std::endl;
+        return false;
+    }
+
+    if (setjmp(png_jmpbuf(png)))
+    {
+        png_destroy_write_struct(&png, &info);
+        fclose(fp);
+        std::cerr << "[GraphicsPlatform] PNG write error" << std::endl;
+        return false;
+    }
+
+    png_init_io(png, fp);
+
+    png_set_IHDR(
+        png, info, width, height,
+        8, PNG_COLOR_TYPE_RGBA, PNG_INTERLACE_NONE,
+        PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
+
+    png_write_info(png, info);
+
+    std::vector<png_bytep> rows(height);
+    for (int y = 0; y < height; ++y)
+    {
+        rows[y] = (png_bytep)(data + (height - 1 - y) * width * 4);
+    }
+
+    png_write_image(png, rows.data());
+    png_write_end(png, nullptr);
+
+    png_destroy_write_struct(&png, &info);
+    fclose(fp);
+
+    return true;
+}
+
+// 画面の幅と高さを取得する
 uint32_t GraphicsPlatform::getScreenWidth() const { return mode_info_.hdisplay; }
 uint32_t GraphicsPlatform::getScreenHeight() const { return mode_info_.vdisplay; }

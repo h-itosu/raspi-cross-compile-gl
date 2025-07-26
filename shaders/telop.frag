@@ -1,39 +1,70 @@
+// 中精度の浮動小数点演算（組込みGPUに適した設定）
 precision mediump float;
 
+// 描画対象のテクスチャ（glyphや文字のα画像）
 uniform sampler2D u_texture;
-uniform vec4 u_outlineColor;
-uniform float u_outlineWidth; // アウトラインの幅をピクセル単位で指定 (例: 1.0, 2.0)
-uniform vec2 u_textureSize;   // テクスチャの解像度 (例: vec2(256.0, 256.0))
 
-varying vec2 v_texcoord;
+// テクスチャサイズ（ピクセル単位）
+uniform vec2 u_textureSize;
+
+// テキスト本体とアウトラインの色
+uniform vec4 u_textColor;
+uniform vec4 u_outlineColor;
+
+// アウトラインの太さ（ピクセル単位指定）
+uniform float u_outlinePixelWidth;
+
+// アウトラインが有効化？
+uniform int u_enableOutline;
+
+// 周囲の余白（未使用ですが将来的に透明領域確保などで活用可能）
+uniform float u_marginPixelSize;
+
+// 頂点シェーダから受け取るUV座標（0.0〜1.0範囲）
+varying vec2 v_texCoord;
 
 void main() {
-    float alpha = texture2D(u_texture, v_texcoord).a;
 
-    // アウトライン検出用
-    float outlineAlpha = 0.0;
-    // 1ピクセル分のUV座標オフセットを計算
-    vec2 onePixel = vec2(1.0, 1.0) / u_textureSize;
+    // 中心ピクセルのアルファ値を取得（本体かどうか判定）
+    float centerAlpha = texture2D(u_texture, v_texCoord).a;
 
-    for (int y = -1; y <= 1; y++) {
-        for (int x = -1; x <= 1; x++) {
-            if (x == 0 && y == 0) continue;
-            // ピクセル単位のオフセットをUV座標に変換してサンプリング
-            vec2 offsetUV = vec2(float(x), float(y)) * onePixel * u_outlineWidth;
-            outlineAlpha += texture2D(u_texture, v_texcoord + offsetUV).a;
-        }
+    if( u_enableOutline == 0)
+    {
+        gl_FragColor = vec4(u_textColor.rgb, centerAlpha);
     }
+    else
+    {
+        // 1ピクセルあたりのUVサイズ（UV空間での画素サイズ）
+        vec2 texelSize = 1.0 / u_textureSize;
 
-    // 描画判定
-    if (alpha > 0.1) {
-        // 中心の白文字
-        gl_FragColor = vec4(1.0, 1.0, 1.0, alpha);
-    } else if (outlineAlpha > 0.1) {
-        // アウトライン
-        // アウトラインの濃さを少し調整したい場合は outlineAlpha を利用する
-        // 例: gl_FragColor = vec4(u_outlineColor.rgb, u_outlineColor.a * min(outlineAlpha, 1.0));
-        gl_FragColor = u_outlineColor;
-    } else {
-        discard;
+        // アウトラインのUV単位のオフセット距離
+        float outlineUV = u_outlinePixelWidth * texelSize.x;
+
+        // 周囲の最大アルファ値を保持（アウトライン判定用）
+        float maxAlpha = 0.0;
+
+        // 近傍3x3ピクセル（±1）を走査して最大アルファ値を取得
+        float sumAlpha = 0.0;
+        int count = 0;
+        for (int x = -1; x <= 1; ++x) {
+            for (int y = -1; y <= 1; ++y) {
+                vec2 offset = vec2(float(x), float(y)) * outlineUV;
+                sumAlpha += texture2D(u_texture, v_texCoord + offset).a;
+                count ++;
+            }
+        }
+        maxAlpha = sumAlpha / float(count);
+
+        // 描画条件によって色を決定
+        if (centerAlpha > 0.0) {
+            vec3 blendedRGB = u_textColor.rgb * centerAlpha + u_outlineColor.rgb * (1.0 - centerAlpha);
+            gl_FragColor = vec4(blendedRGB, 1.0);
+        } else if (maxAlpha >= 0.0) {
+            // 近傍が不透明 → アウトライン領域
+            gl_FragColor = vec4(u_outlineColor.rgb, maxAlpha * u_outlineColor.a);
+        } else {
+            // 完全透明 → マージン領域として描画しない（背景が見える）
+            gl_FragColor = vec4(0.0);
+        }
     }
 }

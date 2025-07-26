@@ -1,11 +1,7 @@
-/**
- * @file Renderer.h
- * @brief OpenGL ESによるYUV描画処理を行うクラスの宣言
- */
-#ifndef RENDERER_H
-#define RENDERER_H
+#pragma once
 
 #include <GLES2/gl2.h>
+#include <vector>
 #include <cstdint>
 
 class Renderer
@@ -14,26 +10,30 @@ public:
     Renderer();
     ~Renderer();
 
-    bool initialize();
+    bool initialize(int width, int height);
     void shutdown();
 
-    // YUVテクスチャアップロード
     void uploadYUVTextures(const uint8_t *data, int width, int height, int ySize, int uSize);
+    void renderYUV(int screenWidth, int screenHeight);
 
-    // 描画
-    void renderYUV(uint32_t width, uint32_t height);
+    void renderToFBO();                                                                   // FBO に描画開始
+    void endOffscreenRender();                                                            // FBO描画終了
+    void renderFBOToScreen(int screenWidth, int screenHeight);                            // FBOを画面に描画
+    bool readPixelsFromFBO(std::vector<unsigned char> &outPixels, int width, int height); // PNG保存用
 
 private:
-    GLuint programYUV_ = 0;
-    GLuint texY_ = 0, texU_ = 0, texV_ = 0;
-    GLuint positionLoc_ = 0;
-    GLuint texcoordLoc_ = 0;
-    GLuint samplerYLoc_ = 0;
-    GLuint samplerULoc_ = 0;
-    GLuint samplerVLoc_ = 0;
+    int fboWidth_ = 0;
+    int fboHeight_ = 0;
 
-    GLuint createProgram(const char *vShaderSrc, const char *fShaderSrc);
-    GLuint loadShader(GLenum type, const char *shaderSrc);
+    GLuint yTex_ = 0;
+    GLuint uTex_ = 0;
+    GLuint vTex_ = 0;
+    GLuint yuvProgram_ = 0;
+
+    GLuint fbo_ = 0;
+    GLuint fboTexture_ = 0;
+    GLuint fboRenderProgram_ = 0;
+    GLuint fboRenderTextureLoc_ = 0;
+
+    GLuint fullScreenQuadVBO_ = 0;
 };
-
-#endif // RENDERER_H

@@ -13,17 +13,23 @@ public:
     TelopRenderer();
     ~TelopRenderer();
 
+    void setupDefaultUniforms(); // 初期設定関数
     bool initialize(const char *fontPath);
     void update();
     void render();
-    void updateText(const std::string &text);
 
+    // ★ テキスト更新用メソッド
+    void SetText(const std::string &text);
+    // ★ フォントサイズを設定
+    void SetFontSize(int size);
     // ★ 追加：アウトライン設定用メソッド
     void setOutline(bool enabled);
     // アウトライン色を設定（RGBA 各値 0.0〜1.0）
     void setOutlineColor(float r, float g, float b, float a);
     // アウトラインの太さを設定（ピクセル単位）
-    void setOutlineWidth(float px);
+    void setOutlinePixelWidth(float px);
+
+    void setMarginSize(float size);
 
 private:
     struct Glyph
@@ -45,8 +51,12 @@ private:
     GLint uniformResolution_;
     GLint uniformTexture_;
     GLint uniformOutlineColor_;
-    GLint uniformOutlineWidth_;
     GLint uniformTextureSize_;
+    GLint uniformEnableOutline_; // アウトライン有効化フラグ
+    GLint uniformMarginSize_;    // マージン制御用 uniform
+    GLint uniformTextColor_;
+    GLint uniformOutlinePixelWidth_;
+
     GLuint vbo_;
 
     std::wstring text_;
@@ -59,10 +69,11 @@ private:
     int screenHeight_;
 
     // アウトライン描画設定
-    float outlineColor_[4]; // RGBA (0.0〜1.0)
-    float outlineWidth_;    // ピクセル単位
+    float outlineColor_[4];   // RGBA (0.0〜1.0)
+    float outlinePixelWidth_; // ピクセル単位
     float textureWidth_[4];
     bool outlineEnabled_ = true;
+    float marginSize_ = 0.0f; // マージンのピクセルサイズ
 
     bool loadGlyph(wchar_t c);
     void renderGlyph(const Glyph &glyph, float x, float y, float alpha);

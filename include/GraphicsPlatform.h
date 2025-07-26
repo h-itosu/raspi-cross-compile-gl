@@ -47,6 +47,7 @@ public:
     uint32_t getScreenHeight() const;
 
     void saveFramebufferToPNG(const char *filename);
+    bool savePixelsToPNG(const char *filename, const unsigned char *data);
 
 private:
     // --- EGL関連のリソース ---

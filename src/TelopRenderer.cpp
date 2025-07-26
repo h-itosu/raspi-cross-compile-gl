@@ -11,16 +11,16 @@
 
 TelopRenderer::TelopRenderer()
     : library_(nullptr), face_(nullptr), telopProgram_(0), attrPosition_(-1), attrTexCoord_(-1),
-      uniformResolution_(-1), uniformTexture_(-1), uniformOutlineColor_(-1), uniformOutlineWidth_(-1), uniformTextureSize_(-1),
+      uniformResolution_(-1), uniformTexture_(-1), uniformOutlineColor_(-1), uniformTextureSize_(-1),
+      uniformMarginSize_(-1), // ← 追加
       vbo_(0), scrollX_(0.0f), startTime_(std::chrono::steady_clock::now()), screenWidth_(1280), screenHeight_(720),
-      outlineEnabled_(false), outlineWidth_(1.0f)
+      outlineEnabled_(false), outlinePixelWidth_(1.0f), marginSize_(4.0f) // ← デフォルトマージン指定
 {
     outlineColor_[0] = 0.0f;
     outlineColor_[1] = 0.0f;
     outlineColor_[2] = 0.0f;
     outlineColor_[3] = 1.0f;
 }
-
 TelopRenderer::~TelopRenderer()
 {
     for (auto &entry : glyphCache_)
@@ -35,6 +35,22 @@ TelopRenderer::~TelopRenderer()
         FT_Done_FreeType(library_);
     if (vbo_)
         glDeleteBuffers(1, &vbo_);
+}
+
+void TelopRenderer::setupDefaultUniforms()
+{
+    glUseProgram(telopProgram_);
+
+    glUniform4f(uniformTextColor_, 1.0f, 1.0f, 1.0f, 1.0f); // 白色 + フルアルファ    glUniform2f(uniformResolution_, (float)screenWidth_, (float)screenHeight_);
+    glUniform4f(uniformOutlineColor_, 0.0f, 0.0f, 0.0f, 1.0f);
+    glUniform1i(uniformEnableOutline_, outlineEnabled_ ? 1 : 0); // アウトライン有効化フラグ
+    glUniform1f(uniformOutlinePixelWidth_, 1.0f);
+
+    glUniform1f(uniformMarginSize_, marginSize_);
+
+    // プレースホルダー：描画対象に応じて更新する部分
+    glUniform2f(uniformTextureSize_, 64.0f, 64.0f); // 仮サイズ（実描画時に上書きされる）
+    glUniform1i(uniformTexture_, 0);                // GL_TEXTURE0 に固定
 }
 
 bool TelopRenderer::initialize(const char *fontPath)
@@ -68,14 +84,29 @@ bool TelopRenderer::initialize(const char *fontPath)
     uniformResolution_ = glGetUniformLocation(telopProgram_, "u_resolution");
     uniformTexture_ = glGetUniformLocation(telopProgram_, "u_texture");
     uniformOutlineColor_ = glGetUniformLocation(telopProgram_, "u_outlineColor");
-    uniformOutlineWidth_ = glGetUniformLocation(telopProgram_, "u_outlineWidth");
     uniformTextureSize_ = glGetUniformLocation(telopProgram_, "u_textureSize");
+    uniformMarginSize_ = glGetUniformLocation(telopProgram_, "u_marginPixelSize");
+    uniformTextColor_ = glGetUniformLocation(telopProgram_, "u_textColor");
+    uniformOutlinePixelWidth_ = glGetUniformLocation(telopProgram_, "u_outlinePixelWidth");
+    uniformEnableOutline_ = glGetUniformLocation(telopProgram_, "u_enableOutline");
 
     glGenBuffers(1, &vbo_);
-
-    updateText("こんにちは、世界！テロップのテスト中です・・・・・いかがでしょうか？〇(^^♪〇");
+    setupDefaultUniforms();
 
     return true;
+}
+
+void TelopRenderer::SetFontSize(int size)
+{
+    if (face_)
+    {
+        FT_Set_Pixel_Sizes(face_, 0, size);
+        std::cout << "Font size set to: " << size << std::endl;
+    }
+    else
+    {
+        std::cerr << "Font face not initialized." << std::endl;
+    }
 }
 
 void TelopRenderer::setOutline(bool enabled)
@@ -91,12 +122,17 @@ void TelopRenderer::setOutlineColor(float r, float g, float b, float a)
     outlineColor_[3] = a;
 }
 
-void TelopRenderer::setOutlineWidth(float width)
+void TelopRenderer::setOutlinePixelWidth(float width)
 {
-    outlineWidth_ = width;
+    outlinePixelWidth_ = width;
 }
 
-void TelopRenderer::updateText(const std::string &text)
+void TelopRenderer::setMarginSize(float size)
+{
+    marginSize_ = size;
+}
+
+void TelopRenderer::SetText(const std::string &text)
 {
     currentText_ = text;
     std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
@@ -156,21 +192,14 @@ bool TelopRenderer::loadGlyph(wchar_t c)
     if (FT_Load_Char(face_, c, FT_LOAD_RENDER))
         return false;
 
-    // ★★★★★ デバッグコードを追加 ★★★★★
-    std::cout << "Loading char '" << (char)c << "'"
-              << " -> Bitmap Size: "
-              << face_->glyph->bitmap.width << "x" << face_->glyph->bitmap.rows
-              << std::endl;
-    // ★★★★★ここまで★★★★★
-
     FT_GlyphSlot g = face_->glyph;
     int originalWidth = g->bitmap.width;
     int originalHeight = g->bitmap.rows;
 
     // アウトライン幅の分だけパディングを追加する
-    int padding = static_cast<int>(outlineWidth_);
-    int paddingX = padding;
-    int paddingY = padding;
+    int padding = static_cast<int>(outlinePixelWidth_);
+    int paddingX = padding + 1;
+    int paddingY = padding + 1;
 
     int expandedWidth = originalWidth + paddingX * 2;
     int expandedHeight = originalHeight + paddingY * 2;
@@ -262,8 +291,10 @@ void TelopRenderer::renderGlyph(const Glyph &glyph, float x, float y, float alph
 
     glUniform2f(uniformResolution_, (float)screenWidth_, (float)screenHeight_);
     glUniform4fv(uniformOutlineColor_, 1, outlineColor_);
-    glUniform1f(uniformOutlineWidth_, outlineEnabled_ ? outlineWidth_ : 0.0f);
+    glUniform1f(uniformOutlinePixelWidth_, outlineEnabled_ ? outlinePixelWidth_ : 0.0f);
+    glUniform1i(uniformEnableOutline_, outlineEnabled_ ? 1 : 0);
     glUniform2f(uniformTextureSize_, (float)glyph.width, (float)glyph.height);
+    glUniform1f(uniformMarginSize_, marginSize_);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, glyph.textureID);

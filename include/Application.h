@@ -41,6 +41,8 @@ private:
     GraphicsPlatform platform_;
     /// @brief レンダラーのインスタンス
     Renderer renderer_;
+    /// @brief テロップレンダラーのインスタンス
+    TelopRenderer telopRenderer_;
 };
 
 #endif // APPLICATION_H
