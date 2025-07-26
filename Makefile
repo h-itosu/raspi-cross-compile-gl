@@ -121,3 +121,32 @@ debug-server-dev: deploy-dev
 clean:
 	@echo "--- Cleaning build directory ---"
 	@rm -rf $(BUILD_DIR)
+
+# --- 新規セットアップ用ワークフロー ---
+.PHONY: generate-script setup-pi
+GENERATOR_SCRIPT := generate_install_script.sh
+INSTALL_SCRIPT   := install_deps.sh
+
+# A. 依存関係スクリプトをPC上に生成する
+generate-script: devbuild
+	@echo "--- [1/3] Pi ($(CYAN)$(RASPI_HOST)$(NC))で依存関係を解析します ---"
+	@$(SCP_CMD) $(EXECUTABLE) $(GENERATOR_SCRIPT) $(RASPI_USER)@$(RASPI_HOST):~/
+	@$(SSH_CMD) "chmod +x ~/${GENERATOR_SCRIPT} && ~/${GENERATOR_SCRIPT} ~/${TARGET_EXEC}"
+	@echo "--- [2/3] 生成されたスクリプト ($(INSTALL_SCRIPT)) をPCに取得します ---"
+	@$(SCP_CMD) $(RASPI_USER)@$(RASPI_HOST):~/${INSTALL_SCRIPT} .
+	@echo "--- [3/3] Pi上の一時ファイルをクリーンアップします ---"
+	@$(SSH_CMD) "rm ~/${TARGET_EXEC} ~/${GENERATOR_SCRIPT} ~/${INSTALL_SCRIPT}"
+	@echo -e "$(GREEN)--- 成功！ '$(INSTALL_SCRIPT)' がPC上に生成されました ---$(NC)"
+
+# B. PC上のスクリプトでPiをセットアップする
+setup-pi:
+	@if [ ! -f "$(INSTALL_SCRIPT)" ]; then \
+		echo "エラー: $(INSTALL_SCRIPT) が見つかりません。"; \
+		echo "先に 'make generate-script' を実行してください。"; \
+		exit 1; \
+	fi
+	@echo "--- [1/2] Pi ($(CYAN)$(RASPI_HOST)$(NC)) にセットアップスクリプトを転送します ---"
+	@$(SCP_CMD) $(INSTALL_SCRIPT) $(RASPI_USER)@$(RASPI_HOST):~/
+	@echo "--- [2/2] Pi上でセットアップを実行します (sudoパスワードを求められる場合があります) ---"
+	@$(SSH_CMD) "chmod +x ~/${INSTALL_SCRIPT} && sudo ~/${INSTALL_SCRIPT}"
+	@echo -e "$(GREEN)--- Pi ($(CYAN)$(RASPI_HOST)$(NC)) のセットアップが完了しました！ ---$(NC)"

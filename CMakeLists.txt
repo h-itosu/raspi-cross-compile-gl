@@ -25,6 +25,15 @@ find_library(EGL_LIBRARY NAMES EGL HINTS /usr/lib/aarch64-linux-gnu)
 find_library(DRM_LIBRARY NAMES drm HINTS /usr/lib/aarch64-linux-gnu)
 find_library(GBM_LIBRARY NAMES gbm HINTS /usr/lib/aarch64-linux-gnu)
 
+# --- PNGライブラリ ---
+find_path(PNG_INCLUDE_DIR NAMES png.h HINTS /usr/include)
+find_library(PNG_LIBRARY NAMES png HINTS /usr/lib/aarch64-linux-gnu)
+
+if (NOT PNG_INCLUDE_DIR OR NOT PNG_LIBRARY)
+    message(FATAL_ERROR "libpng not found. Please install libpng-dev.")
+endif()
+
+
 # --- GStreamerとGLibのヘッダ検索 ---
 find_path(GSTREAMER_INCLUDE_DIR gst/gst.h
     PATHS /opt/raspi_sysroot/usr/include/gstreamer-1.0
@@ -78,6 +87,7 @@ include_directories(
     ${GSTREAMER_INCLUDE_DIR}
     ${GLIB_INCLUDE_DIR}
     ${GLIBCONFIG_INCLUDE_DIR}
+    ${PNG_INCLUDE_DIR}
 )
 
 
@@ -93,6 +103,8 @@ set(REQUIRED_LIBRARIES
     ${GOBJECT_LIB}
     ${GLIB_LIB}
     ${FRTP_LIBRARY}
+    ${FRTP_LIBRARY}
+    ${PNG_LIBRARY}
     m # 数学ライブラリ
 )
 

@@ -7,6 +7,10 @@
 #include <unistd.h>
 #include <termios.h>
 #include <fcntl.h>
+#include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <sstream>
 
 Application::Application() {}
 
@@ -21,10 +25,19 @@ TelopRenderer telopRenderer;
 
 bool Application::initialize()
 {
-    if (!gstreamer_.initialize() ||
-        !platform_.initialize() ||
-        !renderer_.initialize())
+    if (!gstreamer_.initialize())
     {
+        std::cerr << "Failed to initialize GStreamerSupport." << std::endl;
+        return false;
+    }
+    if (!platform_.initialize())
+    {
+        std::cerr << "Failed to initialize GraphicsPlatform." << std::endl;
+        return false;
+    }
+    if (!renderer_.initialize())
+    {
+        std::cerr << "Failed to initialize Renderer." << std::endl;
         return false;
     }
 
@@ -37,7 +50,7 @@ bool Application::initialize()
     // アウトライン描画を有効化（シェーダー側対応）
     telopRenderer.setOutline(true);                        // フラグのみセット、描画はシェーダーで対応
     telopRenderer.setOutlineColor(0.0f, 0.0f, 0.0f, 1.0f); // 黒色アウトライン
-    telopRenderer.setOutlineWidth(0.05f);                  // ピクセル単位の太さ
+    telopRenderer.setOutlineWidth(2.0f);                   // ピクセル単位の太さ
 
     return true;
 }
@@ -85,7 +98,8 @@ bool Application::run()
     std::cout << "[App] Waiting for first frame..." << std::endl;
 
     GStreamerSupport::FrameData frame;
-    int retries = 100;
+    // 【修正点】最初のフレーム取得のタイムアウトを少し長くします
+    int retries = 300; // 3秒程度待つ
     while (retries-- > 0)
     {
         if (gstreamer_.getFrameData(frame))
@@ -93,7 +107,7 @@ bool Application::run()
             std::cout << "[App] First frame received." << std::endl;
             break;
         }
-        usleep(1000);
+        usleep(10000); // 10ms待機
     }
 
     if (retries <= 0)
@@ -103,8 +117,10 @@ bool Application::run()
     }
 
     FPSCounter fpsCounter;
-    int failCount = 0;
-
+    bool isScreenshotMode = false;
+    // --- 【ここから修正】 ---
+    // GStreamer側で同期を行うため、手動でのフレームレート制限ロジックは不要になります。
+    // ループはGStreamerからのフレーム供給に合わせて、可能な限り速く回します。
     while (true)
     {
         if (kbhit())
@@ -115,6 +131,10 @@ bool Application::run()
                 std::cout << "ESC pressed. Exiting..." << std::endl;
                 break;
             }
+            else if (ch == 's' || ch == 'S') // Sキーでスクリーンショット
+            {
+                isScreenshotMode = true;
+            }
         }
 
         if (!gstreamer_.checkBusMessages())
@@ -123,6 +143,8 @@ bool Application::run()
             break;
         }
 
+        // gstreamer_.getFrameData()がGStreamerの再生速度に合わせてブロックし、
+        // タイミングを制御するようになります。
         if (gstreamer_.getFrameData(frame))
         {
             int ySize = frame.width * frame.height;
@@ -135,6 +157,18 @@ bool Application::run()
             telopRenderer.render();
 
             platform_.swapBuffers();
+            if (isScreenshotMode)
+            {
+                // 時刻を取得してファイル名を作成
+                auto t = std::time(nullptr);
+                std::stringstream ss;
+                ss << "ScreenShot_" << std::put_time(std::localtime(&t), "%Y%m%d_%H%M%S") << ".png";
+
+                // 保存処理
+                std::cout << "[App] Saving screenshot to " << ss.str() << std::endl;
+                platform_.saveFramebufferToPNG(ss.str().c_str());
+                isScreenshotMode = false; // スクリーンショットモードをリセット
+            }
 
             if (fpsCounter.frame())
             {
@@ -142,24 +176,12 @@ bool Application::run()
                 util::LogAvailableMemory();
                 timer.LogElapsedTimeHMS();
             }
-            failCount = 0;
 
             gstreamer_.releaseFrame(frame);
         }
         else
         {
-            /*
-            if (++failCount > 60)
-            {
-                std::cout << "End of stream detected. Restarting pipeline..." << std::endl;
-                gstreamer_.restartPipeline("sample.mp4");
-                failCount = 0;
-            }
-            else*/
-            if (failCount % 10 == 0)
-            {
-                std::cerr << "[App] No frame yet (" << failCount << " fails)" << std::endl;
-            }
+            // 新しいフレームがまだない場合、少し待機する
             usleep(1000);
         }
     }

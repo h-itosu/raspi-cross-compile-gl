@@ -28,11 +28,11 @@ bool GStreamerSupport::startPipeline(const char *filepath)
     std::string pipelineDesc = std::string("filesrc location=") + filepath +
                                " ! qtdemux name=demux "
                                " demux.video_0 ! queue "
-                               " ! h264parse ! v4l2h264dec "
+                               " ! h264parse ! avdec_h264 "
                                " ! queue "
-                               " ! v4l2convert output-io-mode=dmabuf-import "
+                               " ! videoconvert "
                                " ! video/x-raw,format=I420 "
-                               " ! appsink name=mysink sync=false";
+                               " ! appsink name=mysink sync=true";
 
     GError *error = nullptr;
     pipeline_ = gst_parse_launch(pipelineDesc.c_str(), &error);
@@ -53,7 +53,7 @@ bool GStreamerSupport::startPipeline(const char *filepath)
     gst_app_sink_set_emit_signals(GST_APP_SINK(appsink_), false);
     gst_app_sink_set_drop(GST_APP_SINK(appsink_), true); // drop有効化！
     gst_app_sink_set_max_buffers(GST_APP_SINK(appsink_), 10);
-    g_object_set(G_OBJECT(appsink_), "sync", FALSE, nullptr);
+    //    g_object_set(G_OBJECT(appsink_), "sync", FALSE, nullptr);
 
     gst_element_set_state(pipeline_, GST_STATE_PLAYING);
     return true;

@@ -55,7 +55,10 @@
         "sstream": "cpp",
         "codecvt": "cpp",
         "map": "cpp",
-        "fstream": "cpp"
+        "fstream": "cpp",
+        "semaphore": "cpp",
+        "stop_token": "cpp",
+        "thread": "cpp"
     },
 
     // -------------------------------------------------------------------------

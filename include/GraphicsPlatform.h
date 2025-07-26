@@ -17,7 +17,8 @@
  * @brief DRM/KMS/GBM/EGLといった低レベルAPIを管理し、OSとハードウェアの差異を抽象化するクラス。
  * ウィンドウの作成、描画コンテキストの管理、画面の更新などを担当する。
  */
-class GraphicsPlatform {
+class GraphicsPlatform
+{
 public:
     /** @brief コンストラクタ */
     GraphicsPlatform();
@@ -45,6 +46,8 @@ public:
     /** @brief 画面の高さを取得する。 @return 画面の高さ（ピクセル数）。 */
     uint32_t getScreenHeight() const;
 
+    void saveFramebufferToPNG(const char *filename);
+
 private:
     // --- EGL関連のリソース ---
     /// @brief EGLディスプレイ接続ハンドル
@@ -55,20 +58,20 @@ private:
     EGLContext context_ = EGL_NO_CONTEXT;
     /// @brief EGLウィンドウサーフェス
     EGLSurface surface_ = EGL_NO_SURFACE;
-    
+
     // --- GBM関連のリソース ---
     /// @brief GBMデバイスハンドル
-    struct gbm_device* gbm_device_ = nullptr;
+    struct gbm_device *gbm_device_ = nullptr;
     /// @brief GBMサーフェスハンドル
-    struct gbm_surface* gbm_surface_ = nullptr;
-    
+    struct gbm_surface *gbm_surface_ = nullptr;
+
     // --- DRM/KMS関連のリソース ---
     /// @brief DRMデバイスのファイルディスクリプタ
     int drm_fd_ = -1;
     /// @brief DRMリソース情報へのポインタ
-    drmModeRes* drm_resources_ = nullptr;
+    drmModeRes *drm_resources_ = nullptr;
     /// @brief 使用するディスプレイコネクタ情報へのポインタ
-    drmModeConnector* drm_connector_ = nullptr;
+    drmModeConnector *drm_connector_ = nullptr;
     /// @brief コネクタのID
     uint32_t connector_id_;
     /// @brief 使用するディスプレイモード情報
@@ -76,11 +79,11 @@ private:
     /// @brief CRTC(ディスプレイコントローラ)のID
     uint32_t crtc_id_;
     /// @brief プログラム実行前のCRTCの状態（終了時に復元するため）
-    drmModeCrtc* original_crtc_ = nullptr;
-    
+    drmModeCrtc *original_crtc_ = nullptr;
+
     // --- バッファ管理 ---
     /// @brief 前のフレームで表示したGBMバッファオブジェクト
-    struct gbm_bo* previous_bo_ = nullptr;
+    struct gbm_bo *previous_bo_ = nullptr;
     /// @brief 前にフレームで表示したDRMフレームバッファのID
     uint32_t previous_fb_id_ = 0;
 };

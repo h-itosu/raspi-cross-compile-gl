@@ -7,10 +7,11 @@
 #include <codecvt>
 #include <fstream>
 #include <sstream>
+#include <vector>
 
 TelopRenderer::TelopRenderer()
     : library_(nullptr), face_(nullptr), telopProgram_(0), attrPosition_(-1), attrTexCoord_(-1),
-      uniformResolution_(-1), uniformTexture_(-1), uniformOutlineColor_(-1), uniformOutlineWidth_(-1),
+      uniformResolution_(-1), uniformTexture_(-1), uniformOutlineColor_(-1), uniformOutlineWidth_(-1), uniformTextureSize_(-1),
       vbo_(0), scrollX_(0.0f), startTime_(std::chrono::steady_clock::now()), screenWidth_(1280), screenHeight_(720),
       outlineEnabled_(false), outlineWidth_(1.0f)
 {
@@ -51,7 +52,7 @@ bool TelopRenderer::initialize(const char *fontPath)
     }
     std::cout << "Font loaded: " << fontPath << std::endl;
 
-    FT_Set_Pixel_Sizes(face_, 0, 48);
+    FT_Set_Pixel_Sizes(face_, 0, 64);
 
     const char *vertexPath = "/home/h.itosu/shaders/telop.vert";
     const char *fragmentPath = "/home/h.itosu/shaders/telop.frag";
@@ -68,10 +69,11 @@ bool TelopRenderer::initialize(const char *fontPath)
     uniformTexture_ = glGetUniformLocation(telopProgram_, "u_texture");
     uniformOutlineColor_ = glGetUniformLocation(telopProgram_, "u_outlineColor");
     uniformOutlineWidth_ = glGetUniformLocation(telopProgram_, "u_outlineWidth");
+    uniformTextureSize_ = glGetUniformLocation(telopProgram_, "u_textureSize");
 
     glGenBuffers(1, &vbo_);
 
-    updateText("こんにちは、世界！");
+    updateText("こんにちは、世界！テロップのテスト中です・・・・・いかがでしょうか？〇(^^♪〇");
 
     return true;
 }
@@ -154,24 +156,57 @@ bool TelopRenderer::loadGlyph(wchar_t c)
     if (FT_Load_Char(face_, c, FT_LOAD_RENDER))
         return false;
 
+    // ★★★★★ デバッグコードを追加 ★★★★★
+    std::cout << "Loading char '" << (char)c << "'"
+              << " -> Bitmap Size: "
+              << face_->glyph->bitmap.width << "x" << face_->glyph->bitmap.rows
+              << std::endl;
+    // ★★★★★ここまで★★★★★
+
     FT_GlyphSlot g = face_->glyph;
+    int originalWidth = g->bitmap.width;
+    int originalHeight = g->bitmap.rows;
+
+    // アウトライン幅の分だけパディングを追加する
+    int padding = static_cast<int>(outlineWidth_);
+    int paddingX = padding;
+    int paddingY = padding;
+
+    int expandedWidth = originalWidth + paddingX * 2;
+    int expandedHeight = originalHeight + paddingY * 2;
+
+    // 拡張バッファの作成（α値のみ）
+    std::vector<unsigned char> expandedBuffer(expandedWidth * expandedHeight, 0);
+
+    // 中央にビットマップを配置（行単位でコピー）
+    for (int row = 0; row < originalHeight; ++row)
+    {
+        memcpy(&expandedBuffer[(row + paddingY) * expandedWidth + paddingX],
+               &g->bitmap.buffer[row * originalWidth],
+               originalWidth);
+    }
+
+    // OpenGL テクスチャ生成
     GLuint tex;
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, g->bitmap.width, g->bitmap.rows, 0, GL_ALPHA, GL_UNSIGNED_BYTE, g->bitmap.buffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, expandedWidth, expandedHeight, 0,
+                 GL_ALPHA, GL_UNSIGNED_BYTE, expandedBuffer.data());
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
+    // Glyph をキャッシュ（描画オフセットも調整）
     Glyph glyph = {
         tex,
-        static_cast<int>(g->bitmap.width),
-        static_cast<int>(g->bitmap.rows),
-        g->bitmap_left,
-        g->bitmap_top,
+        expandedWidth,
+        expandedHeight,
+        g->bitmap_left - paddingX,
+        g->bitmap_top + paddingY,
         static_cast<int>(g->advance.x >> 6)};
+
     glyphCache_[c] = glyph;
     return true;
 }
@@ -228,6 +263,7 @@ void TelopRenderer::renderGlyph(const Glyph &glyph, float x, float y, float alph
     glUniform2f(uniformResolution_, (float)screenWidth_, (float)screenHeight_);
     glUniform4fv(uniformOutlineColor_, 1, outlineColor_);
     glUniform1f(uniformOutlineWidth_, outlineEnabled_ ? outlineWidth_ : 0.0f);
+    glUniform2f(uniformTextureSize_, (float)glyph.width, (float)glyph.height);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, glyph.textureID);

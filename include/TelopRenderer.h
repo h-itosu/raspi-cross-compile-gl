@@ -46,6 +46,7 @@ private:
     GLint uniformTexture_;
     GLint uniformOutlineColor_;
     GLint uniformOutlineWidth_;
+    GLint uniformTextureSize_;
     GLuint vbo_;
 
     std::wstring text_;
@@ -60,6 +61,7 @@ private:
     // アウトライン描画設定
     float outlineColor_[4]; // RGBA (0.0〜1.0)
     float outlineWidth_;    // ピクセル単位
+    float textureWidth_[4];
     bool outlineEnabled_ = true;
 
     bool loadGlyph(wchar_t c);
